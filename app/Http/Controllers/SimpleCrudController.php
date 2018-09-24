@@ -9,36 +9,41 @@ class SimpleCrudController extends Controller
 {
     //
     public function show() {
-    	return view('SimpleCRUD.form');
+    	return view('SimpleCRUD.body');
     }
 
-    public function process(Request $request) {
-        $validator  =   $request->validate([
-                'name'          =>  'required',
-                'mail'          =>  'required',
-                'dateofbirth'   =>  'required',
-                'address'       =>  'required'
-            ]);
+    public function process(\App\Http\Requests\SimpleCRUDRequest $request) {
+        $validator = $request->validated();
 
-        if ($validator->fails()) {
+        $name = $request->get('name');
+        $mail = $request->get('mail');
+        $date = $request->get('dateofbirth');
+        $addr = $request->get('address');
+
+        date_default_timezone_set("Asia/Jakarta");
+        $filename = strtolower(strtok($name, " "))."-".date("dmYHis").".txt";
+
+        $content = $name.",".$mail.",".$date.",".$addr;
+        Storage::disk('public')->put($filename, $content);
+
+        \DB::insert('insert into users (filename, name, email, date_of_birth, address) values (?, ?, ?, ?, ?)', [$filename, $name, $mail, $date, $addr]);
+
+        return 'Terima kasih telah mengisi form';
+    }
+
+    public function get_details(String $file) {
+        if ($file == null) {
             # code...
-            return Redirect::to('/')->withErrors($validator);
+            return Redirect::to('/');
         }
         else {
-            $name = $request->input('name');
-            $mail = $request->input('mail');
-            $date = $request->input('dateofbirth');
-            $addr = $request->input('address');
-
-            date_default_timezone_set("Asia/Jakarta");
-            $filename = strtolower(strtok($name, " "))."-".date("dmYHis").".txt";
-
-            $content = $name.",".$mail.",".$date.",".$addr;
-            Storage::disk('public')->put($filename, $content);
-
-            DB::insert('insert into users (filename, name, email, date_of_birth, address) values (?, ?, ?, ?, ?)', [$filename, $name, $mail, $date, $addr]);
-
-            return 'Terima kasih telah mengisi form';
+            try {
+                $content = Storage::disk('public')->get($file.".txt");
+                $data = explode(",", $content);
+                return view('SimpleCRUD.details')->with(['name'=>$data[0], 'mail'=>$data[1], 'date'=>$data[2], 'addr'=>$data[3]]);
+            } catch (Exception $e) {
+                return Redirect::to('/');
+            }
         }
     }
 }
